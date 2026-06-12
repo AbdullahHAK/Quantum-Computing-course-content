@@ -1,0 +1,26 @@
+{
+  "2": {
+    "depth": 6,
+    "gate_count": 9,
+    "grover_iterations": 1,
+    "classical_baseline": 0.25
+  },
+  "3": {
+    "depth": 10,
+    "gate_count": 21,
+    "grover_iterations": 2,
+    "classical_baseline": 0.125
+  },
+  "4": {
+    "depth": 14,
+    "gate_count": 37,
+    "grover_iterations": 3,
+    "classical_baseline": 0.0625
+  },
+  "5": {
+    "depth": 18,
+    "gate_count": 57,
+    "grover_iterations": 4,
+    "classical_baseline": 0.03125
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "depolarizing": {
+    "2": null,
+    "3": null,
+    "4": null,
+    "5": null
+  },
+  "bitflip": {
+    "2": null,
+    "3": null,
+    "4": null,
+    "5": null
+  },
+  "phaseflip": {
+    "2": null,
+    "3": null,
+    "4": null,
+    "5": null
+  }
+}

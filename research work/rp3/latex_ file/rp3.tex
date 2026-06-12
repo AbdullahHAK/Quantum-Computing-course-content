@@ -1,0 +1,553 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{balance}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% ── Document ──────────────────────────────────────────────────────────────────
+\begin{document}
+
+\title{Performance Analysis of Grover's Search Algorithm\\
+Under Realistic Noise Models on NISQ Simulators}
+
+\author{
+  \IEEEauthorblockN{Saim Haider}
+  \IEEEauthorblockA{
+    \textit{Dept. of Computer Science}\\
+    \textit{FAST-NUCES, Pakistan}\\
+    22P-9244\\
+    p229244@pwr.nu.edu.pk
+  }
+  \and
+  \IEEEauthorblockN{Muhammad Abdullah}
+  \IEEEauthorblockA{
+    \textit{Dept. of Computer Science}\\
+    \textit{FAST-NUCES, Pakistan}\\
+    22P-9371\\
+    p229371@pwr.nu.edu.pk
+  }
+  \and
+  \IEEEauthorblockN{Abdullah}
+  \IEEEauthorblockA{
+    \textit{Dept. of Computer Science}\\
+    \textit{FAST-NUCES, Pakistan}\\
+    22P-9358\\
+    p229358@pwr.nu.edu.pk
+  }
+}
+
+\maketitle
+
+% Abstract
+\begin{abstract}
+Grover's search algorithm offers a quadratic speedup over classical unstructured
+search, making it one of the most practically relevant quantum algorithms for
+near-term deployment. Current quantum hardware operates in the Noisy
+Intermediate-Scale Quantum (NISQ) regime, where decoherence and gate errors
+can significantly degrade algorithm performance. This paper examines the behavior
+of Grover's algorithm under three realistic noise models, namely depolarizing
+noise, bit-flip errors, and phase-flip errors, through a controlled simulation
+study. Using Python and the Qiskit Aer simulator, Grover's search circuit is
+implemented for search spaces of $n = 2, 3, 4, 5$ qubits, with noise injected
+at error rates swept across $p \in [0.001,\, 0.1]$ and success probability
+recorded at each configuration. The results indicate that Grover's algorithm
+retains quantum advantage ($P_{\text{success}} > 1/N$) across the full tested
+error range for all configurations, with the critical threshold $p^{*}$ remaining
+above $0.100$ in every case. Phase-flip and bit-flip noise produce nearly
+identical degradation patterns, while depolarizing noise shows comparatively
+less impact at small qubit counts. Crossover analysis and comparison against
+the theoretical predictions of Salas (2008) and Dowarah et al.\ (2025) are
+included and discussed.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Grover's algorithm, NISQ computing, quantum noise models, quantum advantage,
+Qiskit Aer, depolarizing noise, bit-flip noise, phase-flip noise
+\end{IEEEkeywords}
+
+% ── I. Introduction ───────────────────────────────────────────────────────────
+\section{Introduction}
+
+Quantum computing leverages superposition, entanglement, and quantum interference
+to solve certain problems significantly faster than classical computers. Among the
+most practically relevant quantum algorithms is Grover's search algorithm~\cite{grover1996},
+which achieves $\mathcal{O}(\sqrt{N})$ query complexity for searching an unstructured
+database of $N$ entries, compared to the classical $\mathcal{O}(N)$ average case.
+This quadratic speedup has wide applications in optimization, cryptanalysis, and
+database search.
+
+Despite its theoretical promise, quantum algorithms face a fundamental practical
+challenge: noise. Physical qubits are susceptible to environmental decoherence,
+gate imperfections, and measurement errors. These noise sources corrupt the quantum
+interference patterns that Grover's algorithm relies upon to amplify the probability
+of measuring the correct answer. Present-day quantum processors operate in the NISQ
+regime, characterized by gate error rates on the order of $10^{-3}$ to $10^{-2}$
+and coherence times in the microsecond to millisecond range. Under these conditions,
+even moderately deep circuits such as Grover's can suffer severe degradation in
+success probability.
+
+This work presents a systematic empirical study of Grover's algorithm under
+realistic noise conditions using the Qiskit Aer simulator. By sweeping noise error
+rates across a controlled range and measuring success probability for each
+configuration, this paper identifies the precise noise threshold beyond which
+Grover's algorithm loses its quantum advantage over classical search. The full
+implementation is provided as a reproducible open-source Qiskit notebook.
+
+% ── II. Literature Review ─────────────────────────────────────────────────────
+\section{Literature Review}
+
+\subsection{Ijaz and Faryad (2023) -- Base Paper}
+
+Ijaz and Faryad~\cite{ijaz2023} conducted a comprehensive noise analysis of
+Grover's algorithm using Qiskit Aer for $n = 3, 4, 5$ qubits with 10{,}000 shots
+per configuration. Four noise channels were studied: depolarizing, bit-flip,
+phase-flip, and bit-phase flip. The key finding was that success probability decays
+exponentially with error probability $p$ but only linearly with qubit count $n$.
+However, the study does not identify the critical threshold $p^{*}$ where quantum
+advantage over classical search is lost.
+
+\subsection{Salas (2008)}
+
+Salas~\cite{salas2008} performed the earliest systematic numerical study of noise
+in Grover's algorithm using Fortran-based Monte Carlo simulation for $n = 2$ to
+$7$ qubits under a depolarizing channel model. The study derived an exponential
+damping law and the allowed-error scaling relation
+$\varepsilon_{\text{th}}(N) \sim N^{-1.1}$, identifying an absolute threshold of
+$\varepsilon > 0.043$ above which the algorithm fails for any qubit count. The
+limitation is that only depolarizing noise is studied and the framework predates
+modern Qiskit tooling.
+
+\subsection{Dowarah et al.\ (2025)}
+
+Dowarah et al.~\cite{dowarah2025} applied Random Matrix Theory (RMT) to model the
+noisy Grover operator as a Floquet unitary, deriving two analytical noise
+thresholds: the computing transition at $\delta_{c,\text{comp}} \sim
+\mathcal{O}(2^{-L/2})$ and the ergodicity transition at $\delta_{c,\text{gap}}
+\sim \mathcal{O}(L^{-1})$. The work is entirely theoretical with no Qiskit
+simulation provided.
+
+\subsection{Srivastava et al.\ (2025)}
+
+Srivastava et al.~\cite{srivastava2025} proposed using quantum switches exploiting
+indefinite causal order to mitigate depolarizing noise in Grover's algorithm. The
+study is entirely analytical and does not identify the threshold $p^{*}$ for
+standard Grover circuits without mitigation.
+
+\subsection{Research Gap}
+
+No existing study combines (1) a modern Qiskit simulation framework, (2) multiple
+isolated noise types, (3) systematic error rate sweeps, and (4) explicit
+identification of the quantum advantage loss threshold $p^{*}$. This work fills
+that gap.
+
+% ── III. Methodology ──────────────────────────────────────────────────────────
+\section{Methodology}
+
+This section describes the complete implementation pipeline for simulating Grover's
+search algorithm under realistic noise conditions. The methodology encompasses
+circuit construction, noise model injection, simulation execution, and threshold
+identification.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\columnwidth]{fig_methodology_workflow.png}
+  \caption{Proposed Methodology Workflow Block Diagram for the Grover Noise
+  Analysis Pipeline, showing the seven-stage flow from input specification through
+  circuit construction, noise injection, simulation, probability measurement,
+  threshold identification, to final output.}
+  \label{fig:workflow}
+\end{figure}
+
+\subsection{Circuit Construction}
+
+Grover's search circuit is implemented from first principles in Qiskit for
+$n = 2, 3, 4, 5$ qubits. Each circuit consists of three components: (1) a
+Hadamard initialization layer placing all qubits into uniform superposition,
+(2) an oracle operator $\mathcal{O}_\tau = 2|\tau\rangle\langle\tau| - I$ marking
+the target state $|\tau\rangle = |11\ldots1\rangle$, implemented via an
+H-MCX-H decomposition, and (3) a Grover diffusion operator $D = 2|s\rangle\langle s|
+- I$ performing inversion about the mean. The optimal number of iterations is
+$k = \lfloor (\pi/4)\sqrt{N} \rfloor$, where $N = 2^n$.
+
+Table~\ref{tab:circuit} presents the circuit parameters for each qubit
+configuration after transpilation to the AerSimulator basis gate set. Circuit depth
+grows linearly with $n$, from 6 for $n=2$ to 18 for $n=5$, while gate count grows
+from 9 to 57. These increasing depths accumulate more noise per simulation, making
+larger qubit counts progressively more sensitive to gate error rates.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Circuit Parameters vs.\ Qubit Count}
+  \label{tab:circuit}
+  \begin{tabular}{ccccc c}
+    \toprule
+    $n$ & $N=2^n$ & $k$ & Depth & Gates & Baseline $1/N$ \\
+    \midrule
+    2 & 4  & 1 & 6  & 9  & 0.2500 \\
+    3 & 8  & 2 & 10 & 21 & 0.1250 \\
+    4 & 16 & 3 & 14 & 37 & 0.0625 \\
+    5 & 32 & 4 & 18 & 57 & 0.0313 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Noise Model Injection}
+
+Three noise models are injected independently using the Qiskit Aer \texttt{NoiseModel}
+API. Each error channel is applied per gate across all single-qubit gates
+(\texttt{H, X, Z, U}) and two-qubit gates (\texttt{CX, CCX}).
+
+\textbf{Depolarizing Noise.} A completely mixed state is applied with probability
+$p$, implemented via \texttt{depolarizing\_error(p, 1)} for single-qubit gates and
+\texttt{depolarizing\_error(p, 2)} for two-qubit gates. This channel simultaneously
+corrupts both phase and amplitude information.
+
+\textbf{Bit-Flip Noise.} A Pauli $X$ gate is applied with probability $p$,
+implemented via \texttt{pauli\_error([(`X', p), (`I', 1-p)])}. Two-qubit errors are
+constructed as the tensor product of two independent single-qubit errors.
+
+\textbf{Phase-Flip Noise.} A Pauli $Z$ gate is applied with probability $p$,
+implemented via \texttt{pauli\_error([(`Z', p), (`I', 1-p)])}. Phase-flip noise
+directly disrupts the quantum interference mechanism underlying Grover's amplitude
+amplification.
+
+Error rates are swept across $p \in [0.001, 0.1]$ in 20 uniform steps
+($\Delta p \approx 0.005$), yielding 1{,}200 total simulation configurations
+($3\ \text{noise types} \times 4\ \text{qubit counts} \times 20\ \text{error rates}
+\times 5\ \text{runs}$).
+
+\subsection{Simulation Execution}
+
+All simulations are executed on the Qiskit \texttt{AerSimulator} with a fixed
+random seed (\texttt{seed = 42}) to ensure full reproducibility. Each configuration
+is executed with \texttt{SHOTS = 1024} measurements averaged over \texttt{RUNS = 5}
+independent trials. Success probability is computed as:
+\begin{equation}
+  P_{\text{success}} = \frac{\text{count}(|\tau\rangle)}{1024}
+  \label{eq:psuccess}
+\end{equation}
+averaged over five runs, with error bars representing $\pm 1$ standard deviation.
+Circuits are transpiled to the AerSimulator basis gate set prior to noise injection.
+
+\subsection{Threshold Identification}
+
+The critical threshold $p^{*}$ is defined as the error rate at which Grover's
+measured success probability crosses the classical random search baseline
+$1/N = 1/2^n$. The crossover is identified via linear interpolation:
+\begin{equation}
+  p^{*} = p_i + \frac{\tfrac{1}{N} - P_{\text{mean}}(p_i)}
+  {P_{\text{mean}}(p_{i+1}) - P_{\text{mean}}(p_i)}
+  \cdot (p_{i+1} - p_i)
+  \label{eq:threshold}
+\end{equation}
+where $P_{\text{mean}}(p_i) \geq 1/N > P_{\text{mean}}(p_{i+1})$. If no crossover
+occurs within the tested range, the threshold is recorded as $p^{*} > 0.100$.
+
+\begin{algorithm}
+\caption{Grover Noise Analysis Simulation Pipeline}
+\label{alg:pipeline}
+\begin{algorithmic}[1]
+\REQUIRE $n \in \{2,3,4,5\}$, noise\_type, $p \in [0.001, 0.1]$
+\ENSURE Threshold table, success probability curves
+\STATE Set SHOTS $\leftarrow$ 1024, RUNS $\leftarrow$ 5, seed $\leftarrow$ 42
+\FOR{each $n \in \{2,3,4,5\}$}
+  \STATE $k \leftarrow \lfloor (\pi/4)\sqrt{2^n} \rfloor$
+  \STATE Build Grover circuit $QC(n,\, k,\, \text{target}=|11\ldots1\rangle)$
+  \STATE Transpile $QC$ to AerSimulator basis gate set
+  \FOR{each noise\_type}
+    \FOR{each $p$ in ERROR\_RATES}
+      \STATE $NM \leftarrow$ NoiseModel(noise\_type, $p$)
+      \STATE run\_probs $\leftarrow [\,]$
+      \FOR{$r = 1$ \TO RUNS}
+        \STATE counts $\leftarrow$ AerSimulator.run($QC$, $NM$, SHOTS)
+        \STATE run\_probs.append(counts$[|\tau\rangle]$ / SHOTS)
+      \ENDFOR
+      \STATE stats$[$noise\_type$][n][p] \leftarrow \{\mu,\sigma\}$(run\_probs)
+    \ENDFOR
+    \STATE $p^{*} \leftarrow$ LinearInterpolate(stats, baseline $= 1/2^n$)
+  \ENDFOR
+\ENDFOR
+\STATE Generate Figs.~1--4 and Tables~I--III
+\RETURN thresholds, stats
+\end{algorithmic}
+\end{algorithm}
+
+% ── IV. Results ───────────────────────────────────────────────────────────────
+\section{Results}
+
+This section presents the complete experimental results of simulating Grover's
+search algorithm under three noise models across $n = 2, 3, 4, 5$ qubits. All
+results are derived from 1{,}200 simulation configurations with 1{,}024 shots
+averaged over five independent runs.
+
+\subsection{Noiseless Baseline Validation}
+
+Prior to noise injection, the Grover circuit was validated in an ideal noiseless
+environment. For all qubit configurations, the measured success probability exceeded
+0.97, confirming correct oracle and diffusion operator implementation. Measured
+values reached approximately 0.997 for $n=2$ and 0.973 for $n=5$, with small
+deviations attributable to finite shot statistics.
+
+\subsection{Success Probability vs.\ Error Rate}
+
+Fig.~\ref{fig:success} presents the success probability curves for all three noise
+models across $n = 2$ to $5$ qubits as error rate $p$ increases from 0.001 to 0.1.
+Success probability decays monotonically with increasing $p$ for all configurations,
+consistent with the exponential degradation law reported by Ijaz and Faryad~\cite{ijaz2023}
+and the analytical results of Salas~\cite{salas2008}. Larger qubit counts experience
+steeper decay due to increased circuit depth, as more gate operations accumulate noise
+per run. For $n=5$, the circuit applies four Grover iterations across 57 gates at
+depth 18, compared to one iteration, nine gates, and depth 6 for $n=2$.
+
+At $p = 0.001$, all configurations achieve $P_{\text{success}} > 0.93$. At $p = 0.1$,
+depolarizing noise leaves $n=2$ at $P = 0.655$ against a classical baseline of 0.250,
+and $n=4$ at $P = 0.255$ against a baseline of 0.063. For $n=5$ under bit-flip and
+phase-flip noise, the success probability at $p = 0.1$ approaches approximately 0.09
+to 0.12, still above the classical baseline of 0.031.
+
+\begin{figure*}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig1_success_probability.png}
+  \caption{Grover success probability under depolarizing (left), bit-flip (center),
+  and phase-flip (right) noise models for $n = 2, 3, 4, 5$ qubits. Dashed horizontal
+  lines indicate classical random search baselines $1/N$. Error bars represent
+  $\pm 1$ standard deviation over five independent runs.}
+  \label{fig:success}
+\end{figure*}
+
+\subsection{Noise Model Comparison}
+
+Comparing across noise channels: depolarizing noise causes the least degradation at
+small qubit counts ($n = 2, 3$) but produces comparable degradation at larger $n$.
+Bit-flip and phase-flip noise produce nearly identical degradation curves across all
+configurations, contrary to the initial hypothesis that phase-flip would be more
+severe due to Grover's sensitivity to phase interference. This parity arises because
+both Pauli $X$ and Pauli $Z$ errors are single-channel errors with equivalent
+probability amplitudes. The critical distinction emerges only in circuit architectures
+with strongly asymmetric phase sensitivity.
+
+\subsection{Quantum Advantage Loss Thresholds}
+
+Table~\ref{tab:thresholds} presents the quantum advantage loss threshold $p^{*}$ for
+each noise type and qubit count. A value of $> 0.100$ indicates that Grover's algorithm
+maintains $P_{\text{success}} > 1/N$ throughout the entire tested error range.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Quantum Advantage Loss Threshold $p^{*}$ Values}
+  \label{tab:thresholds}
+  \begin{tabular}{lcccc}
+    \toprule
+    Noise Type     & $n=2$   & $n=3$   & $n=4$   & $n=5$   \\
+    \midrule
+    Depolarizing   & $>0.100$ & $>0.100$ & $>0.100$ & $>0.100$ \\
+    Bit-Flip       & $>0.100$ & $>0.100$ & $>0.100$ & $>0.100$ \\
+    Phase-Flip     & $>0.100$ & $>0.100$ & $>0.100$ & $>0.100$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The finding that $p^{*} > 0.100$ for all 12 configurations is a significant positive
+result. It indicates that Grover's algorithm is remarkably robust within the error
+rate range characteristic of current NISQ hardware, where typical two-qubit gate
+error rates lie between $10^{-3}$ and $10^{-2}$.
+
+\subsection{Threshold Scaling Analysis}
+
+Fig.~\ref{fig:scaling} presents the threshold scaling plot comparing empirical results
+against theoretical predictions. The Salas (2008) law predicts thresholds decreasing
+from approximately 0.058 at $n=2$ to 0.006 at $n=5$. The Dowarah et al.\ (2025)
+computing transition falls even more steeply. The empirical threshold (flat boundary
+at $p^{*} > 0.100$) indicates that the crossover did not occur within the tested
+range for any qubit count or noise type.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig2_threshold_scaling.png}
+  \caption{Quantum advantage loss threshold $p^{*}$ vs.\ qubit count $n$.
+  Empirical results (flat boundary at $p^{*} > 0.100$) compared with Salas (2008)
+  theoretical scaling law $\varepsilon_{\text{th}}(N) \sim N^{-1.1}$ and
+  Dowarah et al.\ (2025) computing transition $\delta_{c,\text{comp}} \sim 2^{-L/2}$.}
+  \label{fig:scaling}
+\end{figure}
+
+\subsection{Crossover Analysis}
+
+Fig.~\ref{fig:crossover} presents grouped bar charts comparing Grover's success
+probability against the classical baseline at two representative error rates:
+$p \approx 0.011$ (low noise, near current best NISQ hardware) and $p \approx 0.048$
+(moderate noise, representative of near-term hardware). At $p = 0.011$, all Grover
+configurations substantially exceed the classical baseline, with $P_{\text{success}}$
+ranging from 0.75 to 0.95 compared to classical baselines between 0.031 and 0.250.
+At $p = 0.048$, quantum advantage is maintained but reduced: $n=5$ configurations
+reach $P \approx 0.27$--$0.30$, still well above the $n=5$ baseline of 0.031.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig3_crossover_comparison.png}
+  \caption{Grover success probability vs.\ classical random search baseline at fixed
+  error rates $p \approx 0.011$ (left) and $p \approx 0.048$ (right) across all
+  noise types and qubit counts. Grey bars indicate the classical baseline $1/N$.}
+  \label{fig:crossover}
+\end{figure}
+
+% ── V. Evaluation ─────────────────────────────────────────────────────────────
+\section{Evaluation of Proposed Work}
+
+\subsection{Comparison with Baseline Methods}
+
+Fig.~\ref{fig:eval} presents the threshold comparison between this work and two
+theoretical baselines. The empirical $p^{*}$ values consistently exceed both
+Salas (2008) and Dowarah et al.\ (2025) predictions across all qubit counts. This
+implies that the standard Grover implementation with optimal $k$ is more
+noise-resilient in practice than Monte Carlo estimates or coherent-noise theoretical
+models suggest. The discrepancy is most pronounced at $n=5$, where Salas (2008)
+predicts a threshold of approximately 0.006 and Dowarah et al.\ predict approximately
+0.003, while empirical measurements show $p^{*} > 0.100$ for all three noise channels.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig4_evaluation_comparison.png}
+  \caption{Threshold comparison: this work (empirical, Qiskit 1.x) vs.\
+  Salas (2008) analytical scaling law and Dowarah et al.\ (2025) computing
+  transition analytical prediction.}
+  \label{fig:eval}
+\end{figure}
+
+\subsection{Comparative Analysis}
+
+Table~\ref{tab:comparison} summarizes the comparative analysis between this work
+and related methods across five dimensions: framework used, noise types studied,
+whether $p^{*}$ is identified, and key limitations.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Comparative Analysis: This Work vs.\ Related Methods}
+  \label{tab:comparison}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{p{2cm}p{1.8cm}p{1.5cm}p{1cm}p{2.2cm}}
+    \toprule
+    Method & Framework & Noise Types & $p^{*}$ & Limitation \\
+    \midrule
+    \textbf{This Work} & Qiskit 1.x Aer & Dep, BF, PF & $>$0.100 all & Small $n$ only \\
+    Ijaz \& Faryad (2023) & Qiskit Aer & Dep,BF,PF,BPF & No & No threshold \\
+    Salas (2008) & Fortran MC & Dep only & 0.043 & Single channel \\
+    Dowarah et al.\ (2025) & Analytical RMT & Coherent & Analytical & No simulation \\
+    Srivastava et al.\ (2025) & Analytical & Dep only & No & No Qiskit \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\subsection{Discussion of Key Findings}
+
+The finding that $p^{*} > 0.100$ for all configurations has direct implications for
+NISQ hardware development. Current state-of-the-art superconducting qubit platforms
+exhibit two-qubit gate error rates of approximately 0.001 to 0.01, well below the
+measured threshold boundary. This indicates that for small search spaces ($n \leq 5$),
+Grover's algorithm can be executed with meaningful quantum advantage on current
+hardware, provided circuit compilation is optimized to minimize unnecessary gate
+count and depth.
+
+The divergence from Salas (2008) predictions at small $n$ may arise from three
+sources. First, Salas used Monte Carlo simulation with per-iteration error models
+rather than per-gate injection. Second, the Fortran simulation predates modern gate
+decomposition optimization. Third, the $n \leq 5$ regime may lie below the
+asymptotic region where the $N^{-1.1}$ scaling applies. Future work extending to
+$n = 6$--$8$ and implementing error mitigation via the quantum switch framework of
+Srivastava et al.\ (2025) is a natural continuation.
+
+% ── VI. Conclusion ────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+This paper presented a comprehensive empirical study of Grover's search algorithm
+under three realistic noise models using the Qiskit Aer simulator. Through 1{,}200
+simulation configurations spanning $n = 2$ to $5$ qubits and error rates
+$p \in [0.001, 0.1]$, four primary conclusions are established.
+
+First, Grover's algorithm maintains quantum advantage throughout the entire
+NISQ-relevant error range for all tested configurations, with $p^{*} > 0.100$
+across all noise types and qubit counts. Second, success probability decays
+monotonically and quasi-exponentially with increasing error rate, consistent with
+existing literature. Third, bit-flip and phase-flip noise produce comparable
+degradation, while depolarizing noise permits greater resilience at small $n$.
+Fourth, empirical thresholds substantially exceed Salas (2008) and Dowarah et al.\
+(2025) theoretical predictions within the small-$n$ regime, suggesting that standard
+Grover circuits are more noise-resilient in practice than prior models indicate.
+
+These results provide concrete, reproducible benchmarks for NISQ hardware calibration
+and establish an empirical foundation for future research in quantum algorithm
+robustness and error mitigation.
+
+% ── References ────────────────────────────────────────────────────────────────
+\balance
+\begin{thebibliography}{00}
+
+\bibitem{grover1996}
+L.~K. Grover, ``A fast quantum mechanical algorithm for database search,''
+in \textit{Proc. 28th Annual ACM Symposium on Theory of Computing (STOC)},
+1996, pp. 212--219.
+
+\bibitem{ijaz2023}
+M.~A. Ijaz and M.~Faryad, ``Noise analysis of Grover and phase estimation
+algorithms implemented as quantum singular value transformations for a small
+number of noisy qubits,'' \textit{Scientific Reports}, vol.~13, p.~20144, 2023.
+
+\bibitem{salas2008}
+P.~J. Salas, ``Noise effect on Grover algorithm,''
+\textit{The European Physical Journal D}, vol.~46, pp.~365--381, 2008.
+
+\bibitem{dowarah2025}
+S.~Dowarah, C.~Zhang, V.~Khemani, and M.~Kolodrubetz,
+``Phases and phase transition in Grover's algorithm with systematic noise,''
+\textit{arXiv preprint arXiv:2406.10344v2}, 2025.
+
+\bibitem{srivastava2025}
+S.~Srivastava, A.~K. Pati, I.~Chakrabarty, and S.~Bhattacharya,
+``Using quantum switches to mitigate noise in Grover's search algorithm,''
+\textit{arXiv preprint arXiv:2401.05866v2}, 2025.
+
+\end{thebibliography}
+
+\end{document}\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{fig_methodology_workflow.png}
+    \caption{Enter Caption}
+\begin{figure}
+        \centering
+        \includegraphics[width=0.5\linewidth]{fig1_success_probability.png}
+        \caption{Enter Caption}
+\begin{figure}
+            \centering
+            \includegraphics[width=0.5\linewidth]{fig2_threshold_scaling.png}
+            \caption{Enter Caption}
+\begin{figure}
+                \centering
+                \includegraphics[width=0.5\linewidth]{fig3_crossover_comparison.png}
+                \caption{Enter Caption}
+\begin{figure}
+                    \centering
+                    \includegraphics[width=0.5\linewidth]{fig4_evaluation_comparison.png}
+                    \caption{Enter Caption}
+                    \label{fig:placeholder}
+                \end{figure}
+                                \label{fig:placeholder}
+            \end{figure}
+                        \label{fig:placeholder}
+        \end{figure}
+                \label{fig:placeholder}
+    \end{figure}
+        \label{fig:placeholder}
+\end{figure}
